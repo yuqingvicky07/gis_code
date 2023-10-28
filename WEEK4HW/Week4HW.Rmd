@@ -1,0 +1,38 @@
+---
+title: "Week4HW"
+output: html_document
+date: "2023-10-28"
+---
+```{r}
+library(here)
+library(sf)
+library(readr)
+library(janitor)
+library(dplyr)
+```
+
+```{r}
+#read spatial data
+world <- st_read(here("../WEEK4/World_Countries_Generalized", "World_Countries_Generalized.shp"))
+world <- clean_names(world)
+```
+```{r}
+#read inequality data
+data_all <- read.csv(here("../WEEK4/HDR21-22_Composite_indices_complete_time_series.csv"))
+data_all <- clean_names(data_all)
+```
+
+```{r}
+#extract useful data
+data_gii <- data_all %>%
+  dplyr::select(country,gii_2010,gii_2019)
+```
+
+```{r}
+#merge spatial and inequality data
+world_gii <- world %>%
+  left_join(., 
+              data_gii,
+              by = c("country" = "country")) %>%
+  mutate(difference = gii_2019 - gii_2010)
+```
