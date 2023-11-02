@@ -9,23 +9,32 @@ library(sf)
 library(readr)
 library(janitor)
 library(dplyr)
+library(countrycode)
+library(tmap)
+library(tmaptools)
+library(tidyverse)
 ```
 
 ```{r}
 #read spatial data
-world <- st_read(here("../WEEK4/World_Countries_Generalized", "World_Countries_Generalized.shp"))
+world <- st_read(here("WEEK4HW/World_Countries_Generalized", "World_Countries_Generalized.shp"))
 world <- clean_names(world)
 ```
 ```{r}
 #read inequality data
-data_all <- read.csv(here("../WEEK4/HDR21-22_Composite_indices_complete_time_series.csv"))
+data_all <- read.csv(here("WEEK4HW/HDR21-22_Composite_indices_complete_time_series.csv"))
 data_all <- clean_names(data_all)
 ```
 
 ```{r}
 #extract useful data
 data_gii <- data_all %>%
-  dplyr::select(country,gii_2010,gii_2019)
+  clean_names()%>%
+  dplyr::select(iso3,country,gii_2010,gii_2019)%>%
+  mutate(difference = gii_2019 - gii_2010)%>%
+  mutate(iso_code=countrycode(country,origin='country.name',destination='iso2c'))%>%
+  mutate(iso_code2=countrycode(iso3,origin='iso3c',destination='iso2c'))
+
 ```
 
 ```{r}
@@ -33,6 +42,105 @@ data_gii <- data_all %>%
 world_gii <- world %>%
   left_join(., 
               data_gii,
-              by = c("country" = "country")) %>%
-  mutate(difference = gii_2019 - gii_2010)
+              by = c("iso" = "iso_code")) 
+```
+
+
+```{r}
+tmap_mode("plot")
+qtm(world_gii,fill='difference')
+```
+
+
+```{r}
+tmap_mode("view")
+
+tm_shape(world_gii) + 
+  tm_polygons("difference") 
+
+```
+
+
+```{r}
+library(leafpop)
+library(leaflet)
+  
+  
+#remove the geometry for our pop up boxes to avoid
+popup2010 <-world_gii %>%
+  st_drop_geometry()%>%
+  dplyr::select(`gii_2010`, country.x)%>%
+  popupTable()
+
+popup2019 <-world_gii %>%
+  st_drop_geometry()%>%
+  dplyr::select(`gii_2019`, country.x)%>%
+  popupTable()
+
+popupdiff <-world_gii %>%
+  st_drop_geometry()%>%
+  dplyr::select(`difference`, country.x)%>%
+  popupTable()
+tmap_mode("view")
+
+# set the colour palettes using our previously defined breaks
+
+
+pal1 <- world_gii %>%
+  colorBin(palette = "Blues", domain=.$`gii_2010`, bins=c(0,0.25,0.5,0.75))
+
+pal2 <- world_gii %>%
+  colorBin(palette = "Blues", domain=.$`gii_2019`, bins=c(0,0.25,0.5,0.75))
+
+pal3 <- world_gii %>%
+  colorBin(palette = "Blues", domain=.$`difference`, bins=c(-0.4,-0.3,-0.2,-0.1,0,0.1))
+
+map<- leaflet(world_gii) %>%
+  # add basemap options
+  addTiles(group = "OSM (default)") %>%
+  addProviderTiles(providers$Stamen.Toner, group = "Toner") %>%
+  addProviderTiles(providers$Stamen.TonerLite, group = "Toner Lite") %>%
+  addProviderTiles(providers$CartoDB.Positron, group = "CartoDB")%>%
+  
+  #add our polygons, linking to the tables we just made
+  addPolygons(color="white", 
+              weight = 1,
+              opacity = 1,
+              dashArray = "2",
+              popup = popup2010,
+              fillOpacity = 0.5,
+              fillColor = ~pal1(`gii_2010`),
+              group = "gii_2010")%>%
+  
+  addPolygons(fillColor = ~pal2(`gii_2019`), 
+              weight = 1,
+              opacity = 1,
+              color = "white",
+              dashArray = "2",
+              popup = popup2019,
+              fillOpacity = 0.5,group = "gii_2019")%>%
+  
+   addPolygons(fillColor = ~pal3(`difference`), 
+              weight = 1,
+              opacity = 1,
+              color = "white",
+              dashArray = "2",
+              popup = popupdiff,
+              fillOpacity = 0.5,group = "difference")%>%
+  # add a legend
+  addLegend(pal = pal1, values = ~`gii_2010`, group = c("gii_2010"),position = "bottomleft", title = "gii_2010")%>%
+  addLegend(pal = pal2, values = ~`gii_2019`,  group = c("gii_2019"),position = "bottomleft", title = "gii_2019")%>%
+  addLegend(pal = pal3, values = ~`difference`, group = c("difference"), 
+            position ="bottomleft", title = "gii difference") %>%
+  
+  
+  # specify layers control
+  addLayersControl(
+    baseGroups = c("OSM (default)", "Toner", "Toner Lite", "CartoDB"),
+    overlayGroups = c("gii_2010", "gii_2019","difference"),
+    options = layersControlOptions(collapsed = FALSE)
+  )
+
+# plot the map
+map
 ```
