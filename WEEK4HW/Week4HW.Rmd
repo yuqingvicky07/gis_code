@@ -13,12 +13,14 @@ library(countrycode)
 library(tmap)
 library(tmaptools)
 library(tidyverse)
+
 ```
 
 ```{r}
 #read spatial data
 world <- st_read(here("WEEK4HW/World_Countries_Generalized", "World_Countries_Generalized.shp"))
 world <- clean_names(world)
+
 ```
 ```{r}
 #read inequality data
@@ -45,6 +47,8 @@ world_gii <- world %>%
               by = c("iso" = "iso_code")) 
 ```
 
+
+date: "2023-11-2"
 
 ```{r}
 tmap_mode("plot")
