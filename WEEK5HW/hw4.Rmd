@@ -1,0 +1,95 @@
+---
+title: "hw4"
+output: html_document
+date: "2023-10-28"
+---
+
+```{r}
+#shapefile
+library(sf)
+library(here) 
+shape <- st_read(here("World_Countries_Generalized", "World_Countries_Generalized.shp"))
+summary(shape)
+#导入csv
+library(tidyverse)
+report <- read_csv(here("HDR21-22_Composite_indices_complete_time_series.csv"))
+```
+
+```{r}
+library(tidyverse)
+library(here)
+library(sf)
+library(janitor)
+library(tmap)
+
+library(remotes)
+
+
+```
+
+```{r}
+library(dplyr)
+report_new <- report %>%
+  clean_names(.)%>% 
+  select(iso3, country, gii_2010,gii_2019)%>%
+  na.omit()%>%
+  mutate(difference=(gii_2019-gii_2010))%>%
+  reframe(iso3, country, gii_2010, gii_2019, difference)
+#report_new
+
+#数据汇总，不用summarise，summarise适合算mean什么的
+```
+leftjoin
+```{r}
+joined_data <- shape %>%
+  #clean_names() %>% #clean_names不与shapefile兼容，是用来清理dataframe的，所以不行
+   
+  left_join(.,
+            report_new ,
+            by = c("COUNTRY" = "country"))%>%
+  na.omit()#这个放在这就没有NA了
+
+```
+
+```{r}
+library(tmap)
+library(tmaptools)
+tmap_mode("plot")
+
+
+map <- joined_data %>% 
+  tm_shape(.) + 
+  tm_fill(col = 'difference', midpoint = NA) +
+  tm_layout(title = 'Gender Inequality Index difference')
+map
+```
+#Create a map of countries with above-average gii in 2019
+```{r}
+mean_gii <- joined_data %>%
+  dplyr::select(gii_2019) %>%
+  summarise(mean=mean(gii_2019, na.rm=TRUE)) 
+```
+
+```{r}
+final_data <- joined_data %>%
+  mutate(whether_above = case_when(gii_2019>mean_gii$mean ~ "Yes", TRUE ~ "No"))
+```
+
+
+```{r}
+#mapping
+tm_shape(final_data) +  
+  tm_polygons("whether_above",  
+              style="pretty",
+              palette="Blues",
+              midpoint=NA,
+              title="Whether above the average",  
+              alpha = 0.9) + 
+  tm_compass(position = c("left", "bottom"),type = "arrow",size = 2) + 
+  tm_scale_bar(position = c("left", "bottom"),text.size = 0.4,width = 0.15) +
+  tm_layout(title = "Counties above or below avearge gii in 2019", 
+            title.size = 0.95,
+            legend.position = c("right", "bottom"),
+            inner.margins = c(0.05, 0.05, 0.15, 0.3))
+```
+
